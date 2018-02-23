@@ -88,6 +88,7 @@ def get_html(url):
   Returns:
     Raw HTML string content in Unicode format.
   """
+  # 如果用相同的设置访问一个网站太多次，会被网站禁止访问。
   user_agent = random.choice(_USER_AGENTS)
   headers = {'User-Agent': user_agent}
   req = urllib2.Request(url=url, headers=headers)
@@ -113,10 +114,10 @@ def get_html(url):
 
 
 class NewsPage(object):
-  def __init__(self, name, url, content_selector):
+  def __init__(self, name, url, content_selector, time_selector):
     self.name = name
     self.url = url
-    self.time_id = 'pubtime_baidu'
+    self.time_selector = time_selector
     self.content_selector = content_selector
 
   def get_news(self):
@@ -125,33 +126,33 @@ class NewsPage(object):
     将获取的新闻以以下形式返回（文章标题，发布时间，文章内容）。
     """
     # Get the raw HTML content of the news page in Unicode.
-    news = ''
-    try:
-      news = get_html(self.url)
-    except:
-      pass
+    news = get_html(self.url)
+    title = ''
+    time = ''
+    content = ''
 
-    # Convert the HTML content to BeautifulSoup object.
-    soup = BeautifulSoup(news, 'html.parser')
+    # 如果获取的新闻内容为空，我们不进行任何处理。
+    if news != '':
+      # Convert the HTML content to BeautifulSoup object.
+      soup = BeautifulSoup(news, 'html.parser')
 
-    # Get the news title.
-    title = soup.title.string
-    logging.debug('News page title is {0}'.format(
-        title.encode('utf-8', 'ignore')))
+      # Get the news title.
+      title = soup.title.string
+      logging.debug('News page title is {0}'.format(
+          title.encode('utf-8', 'ignore')))
 
-    # Get the news time.
-    time = soup.find(id='pubtime_baidu').string
-    temp = datetime.strptime(time, '%Y-%m-%d %H:%M:%S')
-    time = temp.strftime('%Y-%m-%d-%H-%M')
-    logging.debug('News page time is {0}'.format(
-        time.encode('utf-8', 'ignore')))
+      # Get the news time.
+      time = soup.find(id=self.time_selector).string
+      temp = datetime.strptime(time, '%Y-%m-%d %H:%M:%S')
+      time = temp.strftime('%Y-%m-%d-%H-%M')
+      logging.debug('News page time is {0}'.format(
+          time.encode('utf-8', 'ignore')))
 
-    # Get the news content.
-    # content = soup.find(id='fontzoom').get_text()
-    content = soup.select(self.content_selector)[0].get_text()
-    content = content.strip()
-    logging.debug('News page content is {0}'.format(
-        content.encode('utf-8', 'ignore')))
+      # Get the news content.
+      content = soup.select(self.content_selector)[0].get_text()
+      content = content.strip()
+      logging.debug('News page content is {0}'.format(
+          content.encode('utf-8', 'ignore')))
 
     return (title, time, content)
 
@@ -252,24 +253,28 @@ class NewsSpider(object):
         'homepage_url': 'http://yuqing.jxnews.com.cn/',
         'newspage_url_regex': 'http://yuqing.jxnews.com.cn/system/\d+/\d+/\d+/\d+\.shtml',
         'content_selector': '.sc_contect',
+        'time_selector': 'pubtime_baidu',
       },
       # 中国江西网廉政频道
       'lianzheng': {
         'homepage_url': 'http://jjjc.jxcn.cn/',
         'newspage_url_regex': 'http://jjjc.jxcn.cn/system/\d+/\d+/\d+/\d+\.shtml',
         'content_selector': '#Zoom',
+        'time_selector': 'pubtime_baidu',
       },
       # 中国江西网金融频道
       'jinrong': {
         'homepage_url': 'http://finance.jxcn.cn/',
         'newspage_url_regex': 'http://finance.jxcn.cn/system/\d+/\d+/\d+/\d+\.shtml',
         'content_selector': '#fontzoom',
+        'time_selector': 'pubtime_baidu',
       },
       # 大江网经济频道
       'jingji': {
         'homepage_url': 'http://ce.jxcn.cn/',
         'newspage_url_regex': 'http://ce.jxcn.cn/system/\d+/\d+/\d+/\d+\.shtml',
         'content_selector': '.cBlack',
+        'time_selector': 'pubtime_baidu',
       },
     }
 
@@ -284,7 +289,8 @@ class NewsSpider(object):
       newspage_urls = homepage.get_urls()
 
       for url in newspage_urls:
-        newspage = NewsPage(name, url, value['content_selector'])
+        newspage = NewsPage(
+            name, url, value['content_selector'], value['time_selector'])
         newspage.record_news()
 
 
